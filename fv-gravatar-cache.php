@@ -30,8 +30,10 @@ Class FV_Gravatar_Cache {
     add_filter('plugin_action_links', array( &$this, 'plugin_action_links'), 10, 2);
     //  display warning if no options are set
     if( !get_option( 'fv_gravatar_cache') ) {
-      add_action( 'admin_notices', array( &$this, 'admin_notices') );
+      add_option('fv_gravatar_cache_nag','1');
     }
+    add_action( 'admin_notices', array( $this, 'AdminNotices') );
+
     //  change gravatar HTML if cache is configured
     if( get_option( 'fv_gravatar_cache') ) {
       add_filter( 'get_avatar', array( &$this, 'GetAvatar'), 10, 2); 
@@ -47,14 +49,10 @@ Class FV_Gravatar_Cache {
   /**
    * Show warning, if no options are set
    */
-  function admin_notices() {
-    if( !get_option( 'fv_gravatar_cache') ) {
+  function AdminNotices() {
+    if( get_option( 'fv_gravatar_cache_nag') ) {
       echo '<div class="updated fade"><p>FV Gravatar Cache needs to be configured before operational. Please configure it <a href="'.get_bloginfo( 'wpurl' ).'/wp-admin/options-general.php?page=fv-gravatar-cache">here</a>.</p></div>'; 
-    }
-    
-    if(!isset($options['default'])){
-        echo '<div class="updated fade"><p>Thank you for installing FV Gravatar Cache. Please save the settings to store the default gravatar.</p></div>';
-    }   
+    }    
   }
   
   
@@ -114,7 +112,7 @@ Class FV_Gravatar_Cache {
    */
   function CloseLog( ) {
     $options = get_option('fv_gravatar_cache');
-    if( $options['debug'] == true ) {
+    if( isset($options['debug']) && $options['debug'] == true ) {
       @fclose( $this->log );
     }
   }
@@ -171,7 +169,7 @@ Class FV_Gravatar_Cache {
 	  update_option( 'fv_gravatar_cache_offset', 0 );
 	}
 	
-	update_option( 'fv_gravatar_cache', $options);
+    update_option( 'fv_gravatar_cache', $options);
     }
   }
   
@@ -299,14 +297,17 @@ Class FV_Gravatar_Cache {
    */
   function GetCachePath() {
     $options = get_option('fv_gravatar_cache');
-    $path = isset($options['URL']);
-    if( $path == '' ) {
-      $path = WP_PLUGIN_DIR.'/'.dirname( plugin_basename( __FILE__ ) ).'/images';
+    
+    if(isset($options['URL'])){
+      $path = $options['URL'];
     }
-    else {
+    
+    if( $path == '' || !isset($path) ) {
+      $path = WP_PLUGIN_DIR.'/'.dirname( plugin_basename( __FILE__ ) ).'/images';
+    }else {
       $path = $_SERVER['DOCUMENT_ROOT'].$path;
     }
-    return rtrim( $path, '/' ).'/';
+    return rtrim( $path, '/' ).'/';  
   }
   
   
@@ -317,8 +318,12 @@ Class FV_Gravatar_Cache {
    */
   function GetCacheURL() {
     $options = get_option('fv_gravatar_cache');
-    $path = isset($options['URL']);
-    if( $path == '' ) {
+    
+    if(isset($options['URL'])){
+      $path = $options['URL'];
+    }
+    
+    if( $path == '' || !isset($path) ) {
       $path = get_bloginfo( 'wpurl' ).'/wp-content/plugins/'.dirname( plugin_basename( __FILE__ ) ).'/images';
     }
     return rtrim( $path, '/' ).'/';
@@ -421,7 +426,7 @@ Class FV_Gravatar_Cache {
   	  ///  	  
       $myURL = $this->GetCacheURL().$filename;
       $myFile = $this->GetCachePath().$filename;
-      echo $myFile;
+      
       $fh = fopen( $myFile, 'w' );
       if( $fh ) {
         fwrite( $fh, $gravatar );
@@ -487,8 +492,9 @@ Class FV_Gravatar_Cache {
   function OptionsHead() {
       if(stripos($_SERVER['REQUEST_URI'],'/options-general.php?page=fv-gravatar-cache')!==FALSE) {
           $options = get_option('fv_gravatar_cache');
-          if(isset($_POST['fv_gravatar_cache_save'])) {
+          if(isset($_POST['fv_gravatar_cache_save'])) {              
               check_ajax_referer( 'fv_gravatar_cache', 'fv_gravatar_cache' );
+              delete_option('fv_gravatar_cache_nag');
               $options['URL'] = $_POST['URL'];
               $options['size'] = $_POST['size'];
               if( isset( $_POST['debug'] ) ) {
@@ -503,6 +509,7 @@ Class FV_Gravatar_Cache {
               else {
                 $options['cron'] = false;
               }
+              update_option('fv_gravatar_cache', $options); 
               $options['default'] = $this->Cache( 'default', '', $options['size'] );
               update_option('fv_gravatar_cache', $options);  
           }elseif(isset($_POST['fv_gravatar_cache_clear'])) {
@@ -552,9 +559,11 @@ Class FV_Gravatar_Cache {
           if( $file_content ) {
             preg_match( '/avatar_size=(\d*)/', $file_content, $size );
             preg_match( '/get_avatar\(\D*?(\d*)\D*?\)/', $file_content, $size );
-            if( is_numeric( isset($size[1] ) ) ) {
-              $guessed_size = $size[1];
-              break;
+            if( isset($size[1] ) ){
+              if( is_numeric( $size[1]  ) ) {
+                $guessed_size = $size[1];
+                break;
+              }
             }
           }
         }
@@ -568,7 +577,7 @@ Class FV_Gravatar_Cache {
       <?php
       global $wpdb;
       $count = $wpdb->get_var( "SELECT count( email ) FROM `{$wpdb->prefix}gravatars` " );
-      
+          
       ?>
       <form id="gravatarcache" action="" method="post">
         <table class="form-table">
@@ -611,7 +620,7 @@ Class FV_Gravatar_Cache {
               <th scope="row">&nbsp;</th><td>&nbsp;</td>
             </tr>
             <tr valigin="top">
-              <th scope="row">Custom Cache directory URL:</th><td><input name="URL" type="text" value="<?php if(isset($options['URL'])) echo isset($options['URL']) ; ?>" size="50" /> <small>(Leave empty for PLUGIN_DIR/images)</small></td>
+              <th scope="row">Custom Cache directory URL:</th><td><input name="URL" type="text" value="<?php if(isset($options['URL'])) echo $options['URL']; ?>" size="50" /> <small>(Leave empty for PLUGIN_DIR/images)</small></td>
             </tr>
             <tr valigin="top">
               <th scope="row">Gravatar size:</th><td><input name="size" type="text" value="<?php if( isset($options['size']) ) echo $options['size']; else echo '96';  ?>" size="8" />
@@ -621,10 +630,10 @@ Class FV_Gravatar_Cache {
               ?></td>
             </tr>
             <tr valigin="top">
-              <th scope="row">Daily cron:</th><td><input name="cron" type="checkbox" <?php if( isset($options['cron']) == true || !isset( $options['cron'] ) ) echo 'checked="yes" '; ?> /> <small>(Will keep refreshing gravatars during day in smaller chunks)</small></td>
+              <th scope="row">Daily cron:</th><td><input name="cron" type="checkbox" <?php if( $options['cron'] ) echo 'checked="yes" '; ?> /> <small>(Will keep refreshing gravatars during day in smaller chunks)</small></td>
             </tr>
             <tr valigin="top">
-              <th scope="row">Debug mode:</th><td><input name="debug" type="checkbox" <?php if( isset($options['debug'])) echo 'checked="yes" '; ?> /> <small>(check <a target="_blank" href="<?php echo $this->GetCacheURL().'log.txt'; ?>">log.txt</a> file in Cache directory)</small></td>
+              <th scope="row">Debug mode:</th><td><input name="debug" type="checkbox" <?php if( $options['debug'] == true ) echo 'checked="yes" '; ?> /> <small>(check <a target="_blank" href="<?php echo $this->GetCacheURL().'log.txt'; ?>">log.txt</a> file in Cache directory)</small></td>
             </tr>
           </tbody>
         </table>
@@ -715,7 +724,7 @@ function fv_gravatar_cache_cron_run( ) {
     return;
   }
   //  run only if cron is turned on or if it's a forced refresh
-  if( !$options['cron'] && !isset( $_POST['fv_gravatar_cache_refresh'] ) ) {
+  if( $options['cron'] == false && !isset( $_POST['fv_gravatar_cache_refresh'] ) ) {
     return;
   }
   //  make sure offset is not outsite the scope
