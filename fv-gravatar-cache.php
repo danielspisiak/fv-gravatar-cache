@@ -15,8 +15,7 @@ Author URI: http://foliovision.com
 $fv_gravatar_cache_version = '0.3.6';
 
 Class FV_Gravatar_Cache {
-  var $log;
-  
+  var $log;  
   
   /*
   Init all the hooks
@@ -630,7 +629,7 @@ Class FV_Gravatar_Cache {
               ?></td>
             </tr>
             <tr valigin="top">
-              <th scope="row">Daily cron:</th><td><input name="cron" type="checkbox" <?php if( $options['cron'] ) echo 'checked="yes" '; ?> /> <small>(Will keep refreshing gravatars during day in smaller chunks)</small></td>
+              <th scope="row">Daily cron:</th><td><input name="cron" type="checkbox" <?php if( isset( $options['cron'] ) && $options['cron'] ) echo 'checked="yes" '; ?> /> <small>(Will keep refreshing gravatars during day in smaller chunks)</small></td>
             </tr>
             <tr valigin="top">
               <th scope="row">Debug mode:</th><td><input name="debug" type="checkbox" <?php if( $options['debug'] == true ) echo 'checked="yes" '; ?> /> <small>(check <a target="_blank" href="<?php echo $this->GetCacheURL().'log.txt'; ?>">log.txt</a> file in Cache directory)</small></td>
@@ -724,7 +723,7 @@ function fv_gravatar_cache_cron_run( ) {
     return;
   }
   //  run only if cron is turned on or if it's a forced refresh
-  if( $options['cron'] == false && !isset( $_POST['fv_gravatar_cache_refresh'] ) ) {
+  if( !isset( $_POST['fv_gravatar_cache_refresh'] ) &&  $options['cron'] == false ) {
     return;
   }
   //  make sure offset is not outsite the scope
