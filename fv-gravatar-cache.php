@@ -2,17 +2,18 @@
 /*
 Plugin Name: FV Gravatar Cache
 Plugin URI: http://foliovision.com/seo-tools/wordpress/plugins/fv-gravatar-cache
-Version: 0.3.6
+Version: 0.3.7
 Description: Speeds up your website by making sure the gravatars are stored on your website and not loading from the gravatar server.
 Author: Foliovision
 Author URI: http://foliovision.com
 */
 
-/*
+/*CHANGELOG
+ 0.3.7 - repaired conditions, functionality, added warnings ...
  0.3.6 - purge cache after update if cache directory is set to default
 */
 
-$fv_gravatar_cache_version = '0.3.6';
+$fv_gravatar_cache_version = '0.3.7';
 
 Class FV_Gravatar_Cache {
   var $log;  
@@ -26,6 +27,7 @@ Class FV_Gravatar_Cache {
     add_action( 'admin_init', array( &$this, 'OptionsHead' ) );
     add_action( 'admin_menu', array( &$this, 'OptionsPage') );
     add_action('wp_footer', array( &$this, 'IsAdmin' ),1 );
+    add_action( 'admin_init', array( &$this ,'Check_images_directory'));
     add_filter('plugin_action_links', array( &$this, 'plugin_action_links'), 10, 2);
     //  display warning if no options are set
     if( !get_option( 'fv_gravatar_cache') ) {
@@ -51,7 +53,12 @@ Class FV_Gravatar_Cache {
   function AdminNotices() {
     if( get_option( 'fv_gravatar_cache_nag') ) {
       echo '<div class="updated fade"><p>FV Gravatar Cache needs to be configured before operational. Please configure it <a href="'.get_bloginfo( 'wpurl' ).'/wp-admin/options-general.php?page=fv-gravatar-cache">here</a>.</p></div>'; 
-    }    
+    }
+    
+    if(get_option( 'fv_gravatar_empty_folder' )){
+      echo '<div class="error fade"><p>FV Gravatar Cache cache folder is empty, clearing out the cache data. Please re-save <a href="'.get_bloginfo( 'wpurl' ).'/wp-admin/options-general.php?page=fv-gravatar-cache">FV Gravatar Cache</a> settings to see if it works.</p></div>';
+    }
+    
   }
   
   
@@ -343,7 +350,6 @@ Class FV_Gravatar_Cache {
     return $comments;
   }
   
-  
   /**
    * Download a single gravatar. Provide email address and alternativelly also gravatar URL
    *
@@ -430,10 +436,14 @@ Class FV_Gravatar_Cache {
       if( $fh ) {
         fwrite( $fh, $gravatar );
         fclose( $fh );
+        
       }
-      }     
+      
+      }    
       return $myURL;
   }
+  
+  
   
   
   /**
@@ -484,6 +494,36 @@ Class FV_Gravatar_Cache {
 		return $this->Cron( $comment->comment_author_email, $options['size'] );	
   }
   
+   /*
+   * Check images directory and if there aren't any "something.png" files it clean cache.
+   */
+  function Check_images_directory(){   
+    $dir = $this->GetCachePath();
+    
+    $folder = scandir($dir);
+    $count = 0;
+    
+    foreach($folder as $name){
+      
+      if($name != '.' && $name != '..' && $name != 'index.php'){
+        $count++;
+      }
+      
+    }
+        
+    if($count == 0){    
+      global $wpdb;
+      $cacheCount = $wpdb->get_var( "SELECT count( email ) FROM `{$wpdb->prefix}gravatars` " );
+      
+      if($cacheCount > 0){
+        check_ajax_referer( 'fv_gravatar_cache', 'fv_gravatar_cache',0 );
+        $wpdb->query( "TRUNCATE TABLE `{$wpdb->prefix}gravatars` " );
+        update_option( 'fv_gravatar_cache_offset', 0 );
+        add_option('fv_gravatar_empty_folder','1');
+      }      
+    }
+    
+  }
   
   /*
   Save settings
@@ -494,6 +534,7 @@ Class FV_Gravatar_Cache {
           if(isset($_POST['fv_gravatar_cache_save'])) {              
               check_ajax_referer( 'fv_gravatar_cache', 'fv_gravatar_cache' );
               delete_option('fv_gravatar_cache_nag');
+              delete_option('fv_gravatar_empty_folder');
               $options['URL'] = $_POST['URL'];
               $options['size'] = $_POST['size'];
               if( isset( $_POST['debug'] ) ) {
@@ -619,7 +660,7 @@ Class FV_Gravatar_Cache {
               <th scope="row">&nbsp;</th><td>&nbsp;</td>
             </tr>
             <tr valigin="top">
-              <th scope="row">Custom Cache directory URL:</th><td><input name="URL" type="text" value="<?php if(isset($options['URL'])) echo $options['URL']; ?>" size="50" /> <small>(Leave empty for PLUGIN_DIR/images)</small></td>
+              <th scope="row">Custom Cache directory URL:<abbr title="Use path like /images/gravatars and make sure it exists in your public_html folder and is writable.">[?]</abbr></th><td><input name="URL" type="text" value="<?php if(isset($options['URL'])) echo $options['URL']; ?>" size="50" /> <small>(Leave empty for PLUGIN_DIR/images)</small></td>
             </tr>
             <tr valigin="top">
               <th scope="row">Gravatar size:</th><td><input name="size" type="text" value="<?php if( isset($options['size']) ) echo $options['size']; else echo '96';  ?>" size="8" />
