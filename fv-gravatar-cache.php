@@ -93,7 +93,7 @@ Class FV_Gravatar_Cache {
     }
     //  make it associative array
     foreach( $fv_gravatars AS $key => $value ) {
-      $fv_gravatars[$value->email] = array( 'url' => $value->url, 'time' => $value->time );
+      $fv_gravatars[strtolower($value->email)] = array( 'url' => $value->url, 'time' => $value->time );
       unset($fv_gravatars[$key]);
     } 
     return $fv_gravatars;
@@ -193,6 +193,9 @@ Class FV_Gravatar_Cache {
     $gravatars = wp_cache_get('fv_gravatars_set', 'fv_gravatars');
     //echo '<!-- count gravatars '; echo count( $gravatars ); echo '-->';
     global $comment, $wpdb;
+    
+    $comment_email = strtolower($comment->comment_author_email);
+    
     //  match the current gravatar URL
     preg_match( '/src=\'(.*?)\'/', $image, $url );
     if( $url[1] ) {
@@ -202,10 +205,10 @@ Class FV_Gravatar_Cache {
       return $image;
     }
     //  check out the cache. If the entry is not found, then you will have to insert it, no update.
-    if( !isset( $gravatars[$comment->comment_author_email] ) || $gravatars[$comment->comment_author_email]['url'] == '' ) {
+    if( !isset( $gravatars[$comment_email] ) || $gravatars[$comment_email]['url'] == '' ) {
       $not_in_cache = true;
     }
-    $gravatar = ( isset($comment->comment_author_email) && !empty($comment->comment_author_email)) ? $gravatars[$comment->comment_author_email] : false;
+    $gravatar = ( isset($comment->comment_author_email) && !empty($comment->comment_author_email)) ? $gravatars[$comment_email] : false;
     //  alternative ways how to store gravatars
     //$gravatar = $wpdb->get_row( "SELECT time, url FROM `{$wpdb->prefix}gravatars` WHERE email = '{$comment->comment_author_email}' " );
     //$gravatar = get_comment_meta( $comment->comment_ID, 'gravatar' );
@@ -232,11 +235,11 @@ Class FV_Gravatar_Cache {
       return $image;  //  just display the remote image, don't download the gravatar
       //$gravatar = fv_get_url( $url );
       //echo 'Downloading: '; var_dump( $url );
-      $gravatar_local = $this->Cache( $comment->comment_author_email, '', '' );
+      $gravatar_local = $this->Cache( $comment_email, '', '' );
       //update_comment_meta( $comment->comment_ID, 'gravatar', array( date('U'), $myURL ) );   
       $time = date('U');
       if( $not_in_cache ) {
-        $wpdb->query( "INSERT INTO `{$wpdb->prefix}gravatars` (email,time,url) VALUES ( '{$comment->comment_author_email}', '{$time}', '{$gravatar_local}' ) " );
+        $wpdb->query( "INSERT INTO `{$wpdb->prefix}gravatars` (email,time,url) VALUES ( '{$comment_email}', '{$time}', '{$gravatar_local}' ) " );
       }
       /*else {
         $wpdb->query( "UPDATE `{$wpdb->prefix}gravatars` SET url = '{$myURL}', time = '{$time}' WHERE email = '{$comment->comment_author_email}' " );
@@ -491,7 +494,7 @@ Class FV_Gravatar_Cache {
 		remove_filter('get_avatar', array(&$this, 'GetAvatar'), 10, 2); 
 		// cache gravatar
 		$options = get_option( 'fv_gravatar_cache');
-		return $this->Cron( $comment->comment_author_email, $options['size'] );	
+		return $this->Cron( strtolower($comment->comment_author_email), $options['size'] );	
   }
   
    /*
