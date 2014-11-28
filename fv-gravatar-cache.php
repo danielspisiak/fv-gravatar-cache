@@ -28,7 +28,7 @@ Class FV_Gravatar_Cache {
     add_action( 'admin_menu', array( &$this, 'OptionsPage') );
     add_action('wp_footer', array( &$this, 'IsAdmin' ),1 );
     add_action( 'admin_init', array( &$this ,'Check_images_directory'));
-    add_filter('plugin_action_links', array( &$this, 'plugin_action_links'), 10, 2);
+    add_filter('plugin_action_links', array( &$this, 'fv_gravatar_cache_plugin_action_links'), 10, 2);
     //  display warning if no options are set
     if( !get_option( 'fv_gravatar_cache') ) {
       add_option('fv_gravatar_cache_nag','1');
@@ -700,10 +700,14 @@ Class FV_Gravatar_Cache {
   		add_options_page('FV Gravatar Cache', 'FV Gravatar Cache', 'edit_pages', 'fv-gravatar-cache', array( &$this, 'OptionsManage' ) );
   	}
   }
-  function plugin_action_links($links, $file) {
+  
+  /*
+   Added settings on plugin page.
+   */
+  function fv_gravatar_cache_plugin_action_links($links, $file) {
   	$plugin_file = basename(__FILE__);
   	if (basename($file) == $plugin_file) {
-  		$settings_link = '<a href="options-general.php?page='.str_replace( '.php', '', $plugin_file ).'">Settings</a>';
+      $settings_link =  '<a href="'.site_url('wp-admin/options-general.php?page=fv-gravatar-cache').'">Settings</a>';
   		array_unshift($links, $settings_link);
   	}
   	return $links;
