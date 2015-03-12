@@ -132,6 +132,10 @@ Class FV_Gravatar_Cache {
    * @return string URL of cached gravatar
   */
   function Cron( $email, $size = '96' ) {
+    if( !$email || strlen(trim($email)) == 0 ) {
+      $email;
+    }    
+    
     global $wpdb;
   	if ( ! get_option('show_avatars') )
   		return false;
